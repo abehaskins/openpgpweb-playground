@@ -5,39 +5,56 @@ import { Component, Inject, Model, Prop, Watch } from "vue-property-decorator";
 import Boilerplate from "../Boilerplate";
 
 import FirebaseSingleton from "../../services/FirebaseSingleton";
+import { ReadFile } from "../../utils";
+import {pubkey} from "../../keys";
 
-type Visit = {
-  created_at: Date;
-  confirmed_at: Date;
-};
+const openpgp = require("openpgp");
+(window as any).openpgp = openpgp;
 
 @Component({
-  components: {Boilerplate}
+  components: { Boilerplate }
 })
 export default class App extends Vue {
   name = "app";
-  msg = "Welcome to Your Vue.js App";
-  visits: Visit[] = [];
   fst: FirebaseSingleton;
+  secret = "hello world";
+  img_src = "";
 
   async mounted() {
     this.fst = await FirebaseSingleton.GetInstance();
 
-    this.fst.firestore
-      .collection("visits")
-      .onSnapshot(snapshot => {
-        snapshot.docChanges.forEach(change => {
-          if (change.type == "added") {
-            this.visits.push(change.doc.data() as Visit);
-          }
-        });
-      });
+    await this.DoDecryptedFileDownload();
   }
 
-  add_visit() {
-    this.fst.firestore
-      .collection("visits")
-      .add({ created_at: new Date() });
+  async DoEncryptedFileUpload(plaindata: Uint8Array) {
+    const options = {
+      data: plaindata,
+      publicKeys: openpgp.key.readArmored(pubkey).keys,
+      armor: false
+    };
+
+    const ciphertext = await openpgp.encrypt(options);
+    const encrypted = ciphertext.message.packets.write();
+
+    const storageRef = this.fst.storage.ref("/encrypted/file.pgp");
+    const snapshot = await storageRef.put(encrypted);
+    console.log(snapshot.state);
+  }
+
+  async DoDecryptedFileDownload() {
+    const self = this;
+    const url = await this.fst.storage
+      .ref("/encrypted/file.pgp")
+      .getDownloadURL();
+
+    self.img_src = url;
+  }
+
+  async OnFileChanged(e: Event) {
+    const self = this;
+    const file = (e.target as HTMLInputElement).files[0];
+    const array = await ReadFile(file);
+    await self.DoEncryptedFileUpload(array);
   }
 }
 
