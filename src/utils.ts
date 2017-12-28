@@ -15,14 +15,3 @@ export function ParseURL(href: string) {
 
   return parser;
 }
-
-export function ReadFile(data: File | Blob): Promise<Uint8Array> {
-  return new Promise((resolve, _) => {
-    const reader = new FileReader();
-
-    reader.onload = async function() {
-      resolve(new Uint8Array(this.result));
-    };
-    reader.readAsArrayBuffer(data);
-  });
-}

@@ -1,8 +1,3 @@
-const NONCACHED_HOSTS = [
-  "https://www.googleapis.com/",
-  "https://firestore.googleapis.com"
-];
-
 const pending = {};
 
 self.addEventListener("message", function(event) {

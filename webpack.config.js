@@ -1,5 +1,6 @@
 var path = require("path");
 var webpack = require("webpack");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   entry: "./src/main.ts",
@@ -53,6 +54,21 @@ module.exports = {
       }
     ]
   },
+  plugins: [
+    /*
+    Needed for src/pgp.ts
+     */
+    new CopyWebpackPlugin(
+      [
+        {
+          context: "node_modules/openpgp/dist/",
+          from: "openpgp*min.js",
+          to: "artifacts/"
+        }
+      ],
+      {}
+    )
+  ],
   resolve: {
     extensions: [".ts", ".js", ".vue", ".json"],
     alias: {
@@ -87,6 +103,7 @@ module.exports = {
   devtool: "#eval-source-map"
 };
 
+console.log(path.resolve(__dirname));
 if (process.env.NODE_ENV === "production") {
   module.exports.devtool = "#source-map";
   // http://vue-loader.vuejs.org/en/workflow/production.html

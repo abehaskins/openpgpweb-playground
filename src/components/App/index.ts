@@ -5,11 +5,8 @@ import { Component, Inject, Model, Prop, Watch } from "vue-property-decorator";
 import Boilerplate from "../Boilerplate";
 
 import FirebaseSingleton from "../../services/FirebaseSingleton";
-import { ReadFile } from "../../utils";
-import {pubkey} from "../../keys";
-
-const openpgp = require("openpgp");
-(window as any).openpgp = openpgp;
+import { PGPSingleton } from "../../pgp";
+import { pubkey, will_pubkey } from "../../keys";
 
 @Component({
   components: { Boilerplate }
@@ -17,44 +14,36 @@ const openpgp = require("openpgp");
 export default class App extends Vue {
   name = "app";
   fst: FirebaseSingleton;
-  secret = "hello world";
+  pgp: PGPSingleton;
   img_src = "";
 
   async mounted() {
     this.fst = await FirebaseSingleton.GetInstance();
+    this.pgp = await PGPSingleton.GetInstance();
 
-    await this.DoDecryptedFileDownload();
-  }
+    this.img_src = await this.fst.storage
+        .ref("/encrypted/file.pgp")
+        .getDownloadURL();
 
-  async DoEncryptedFileUpload(plaindata: Uint8Array) {
-    const options = {
-      data: plaindata,
-      publicKeys: openpgp.key.readArmored(pubkey).keys,
-      armor: false
-    };
+    const msg = await this.pgp.GetEncryptedString("hi there", [will_pubkey]);
+    const plaintext = await this.pgp.GetDecryptedString(msg);
 
-    const ciphertext = await openpgp.encrypt(options);
-    const encrypted = ciphertext.message.packets.write();
-
-    const storageRef = this.fst.storage.ref("/encrypted/file.pgp");
-    const snapshot = await storageRef.put(encrypted);
-    console.log(snapshot.state);
-  }
-
-  async DoDecryptedFileDownload() {
-    const self = this;
-    const url = await this.fst.storage
-      .ref("/encrypted/file.pgp")
-      .getDownloadURL();
-
-    self.img_src = url;
+    console.log(msg, plaintext);
   }
 
   async OnFileChanged(e: Event) {
-    const self = this;
     const file = (e.target as HTMLInputElement).files[0];
-    const array = await ReadFile(file);
-    await self.DoEncryptedFileUpload(array);
+    const ref = this.fst.storage.ref("/encrypted/file.pgp");
+
+    const blob = await this.pgp.GetEncryptedBlob(file, [pubkey, will_pubkey]);
+    const snapshot = await ref.put(blob);
+
+    return snapshot.state;
+  }
+
+  async ClearCache() {
+    await this.pgp.ClearBlobCache();
+    console.log("Decrypted blob cache cleared!");
   }
 }
 
